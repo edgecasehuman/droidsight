@@ -1,0 +1,97 @@
+name: Bug report
+description: Something behaved differently than documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Almost every droidsight bug depends on the device, the Android version,
+        or the ADB build, so those fields matter more than they usually would.
+
+        **Redact before you paste.** Logcat, UI dumps, notifications, crash
+        reports, screenshots, and device serials routinely contain account
+        names, message content, and location data. Nothing here needs your real
+        serial — `<serial>` is fine.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: What you expected, and what the tool did instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How to reproduce
+      description: >
+        The tool call that triggered it, with arguments, is the most useful
+        thing you can provide. A full MCP client transcript is rarely needed.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: droidsight version
+      placeholder: "1.0.0, or the commit SHA if built from source"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How it was installed
+      options:
+        - npx / npm
+        - Built from source
+        - Standalone release archive
+    validations:
+      required: true
+
+  - type: input
+    id: host
+    attributes:
+      label: Host OS and MCP client
+      placeholder: "Windows 11, Claude Desktop"
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      description: Vendor and model matter — several known issues are vendor-specific.
+      placeholder: "Pixel 7, Android 14"
+    validations:
+      required: true
+
+  - type: input
+    id: adb
+    attributes:
+      label: ADB version
+      description: Output of `adb version`, first line.
+      placeholder: "Android Debug Bridge version 1.0.41"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: >
+        stderr from the server, or a `DROIDSIGHT_DEBUG_LOG` excerpt. Optional,
+        and only after redacting.
+      render: text
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed personal data, serials, and account names from anything I pasted.
+          required: true
+        - label: This is not a security vulnerability. (Those go through the private advisory form linked on the new-issue page.)
+          required: true

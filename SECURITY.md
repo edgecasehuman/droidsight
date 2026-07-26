@@ -1,31 +1,38 @@
 # Security Policy
 
-## Supported versions
-
-Security fixes are made on the default branch. Until the project publishes a
-formal support matrix, older commits, binaries, forks, and unofficial builds
-should not be assumed to receive security updates.
-
 ## Reporting a vulnerability
 
-Please do not disclose a suspected vulnerability in a public issue, discussion,
-pull request, log, or transcript.
+Report privately through GitHub, not in a public issue, discussion, pull
+request, log, or transcript:
 
-Use GitHub's **Security** tab and its private vulnerability-reporting form when
-that feature is available. Include:
+**[Open a private security advisory](https://github.com/edgecasehuman/droidsight/security/advisories/new)**
+— or use the **Security** tab on the repository, then *Report a vulnerability*.
+
+This project is maintained anonymously and has no contact email. The GitHub
+advisory form is the only private channel, and it is monitored.
+
+Useful things to include, in rough order of value:
 
 - the affected commit or version;
-- a concise description of the impact and required preconditions;
+- the impact and the preconditions it requires;
 - reproduction steps or a minimal proof of concept;
-- whether a real Android device or host was affected; and
-- any suggested mitigation, if known.
+- whether a real Android device or host was involved; and
+- a suggested mitigation, if you have one.
 
-Remove device serials, account data, authentication material, personal data,
-screenshots, UI dumps, logs, and other secrets before attaching evidence. The
-maintainers should acknowledge a private report, assess its scope, coordinate a
-fix, and agree on disclosure timing before publication. If private reporting is
-not enabled, ask the repository owner to provide a private reporting channel
-without including vulnerability details in the request.
+**Redact before attaching evidence.** Device serials, account data,
+authentication material, screenshots, UI dumps, notification content, and logs
+routinely carry personal data. A report is not worth less for having them
+removed.
+
+There is no bounty. Expect an acknowledgement within about a week. If a report
+is valid, a fix and an advisory are published together, and you are credited
+under whatever name you ask for — including none.
+
+## Supported versions
+
+Only the latest released version is supported. Fixes ship as a new release
+rather than as patches to older tags, and older commits, forks, and unofficial
+builds should not be assumed to receive them.
 
 ## Trust and authority boundary
 

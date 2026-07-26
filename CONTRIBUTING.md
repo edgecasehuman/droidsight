@@ -45,6 +45,13 @@ change process-wide ADB configuration. The release build uses one compilation
 job so the same command remains reliable on memory-constrained hosts. CI runs
 the same four gates on Linux, macOS, and Windows, without the `-j 1` cap.
 
+A separate job type-checks the crate against the `rust-version` floor declared
+in `Cargo.toml`, which is several releases older than the pinned compiler. That
+floor is published to crates.io as a compatibility promise, so raising it has to
+be a deliberate manifest edit rather than something a merged pull request does
+by accident. Clippy and rustfmt are not run there: their output legitimately
+differs between compiler versions.
+
 Update `Cargo.lock` with an intentional dependency change, and include it in the
 same pull request. Do not weaken warnings, remove a safety limit, or add a blanket
 lint suppression merely to make a gate pass. Add deterministic regression tests

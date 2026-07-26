@@ -1,6 +1,7 @@
 # droidsight
 
 [![CI](https://github.com/edgecasehuman/droidsight/actions/workflows/ci.yml/badge.svg)](https://github.com/edgecasehuman/droidsight/actions/workflows/ci.yml)
+[![Security audit](https://github.com/edgecasehuman/droidsight/actions/workflows/audit.yml/badge.svg)](https://github.com/edgecasehuman/droidsight/actions/workflows/audit.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 An MCP server that drives a real Android device over ADB — and hands the agent
@@ -314,7 +315,8 @@ cargo build --locked --release --bin droidsight
 ```
 
 These gates run on Linux, macOS, and Windows and pass without warning
-suppressions.
+suppressions. The compiler is pinned in `rust-toolchain.toml`; a separate CI job
+verifies that the crate still builds on Rust 1.89, the declared minimum.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before changing device-affecting code.
 [SECURITY.md](SECURITY.md) documents private reporting, sensitive-evidence

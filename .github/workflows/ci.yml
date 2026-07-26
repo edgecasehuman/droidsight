@@ -52,3 +52,48 @@ jobs:
 
       - name: Build release binary
         run: cargo build --locked --release --bin droidsight
+
+  # `rust-version` in Cargo.toml is published to crates.io as a compatibility
+  # promise, and the pinned toolchain above is far newer than it. Without this
+  # job the promise is never tested, and a dependency bump or a newly stabilized
+  # API would break it silently.
+  msrv:
+    name: Minimum supported Rust
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: msrv
+
+      # Read the floor out of the manifest instead of repeating it here, so the
+      # version that is published and the version that is tested cannot drift.
+      - name: Resolve the declared minimum
+        id: msrv
+        run: |
+          set -euo pipefail
+          version="$(sed -n '/^\[package\]/,/^\[/p' Cargo.toml \
+            | sed -n 's/^rust-version = "\(.*\)"/\1/p' | head -n 1)"
+          if [ -z "$version" ]; then
+            echo "::error::Cargo.toml declares no rust-version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Declared MSRV: $version"
+
+      # The minimum has to be requested by name. rust-toolchain.toml would
+      # otherwise select the pinned compiler and this job would retest that pin.
+      # Only a type check runs: Clippy and rustfmt output legitimately differs
+      # between compiler versions, so those gates belong on the pin alone.
+      - name: Check against the declared minimum
+        env:
+          VERSION: ${{ steps.msrv.outputs.version }}
+        run: |
+          set -euo pipefail
+          rustup toolchain install "$VERSION" --profile minimal --no-self-update
+          cargo "+$VERSION" check --locked --all-targets
