@@ -41,7 +41,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 async-trait = "0.1"
-rand = "0.9"
+rand = "0.10"
 unicode-normalization = "0.1"
 
 # Release binaries are downloaded per platform by the npm wrapper, so size and

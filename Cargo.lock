@@ -338,7 +338,7 @@ dependencies = [
  "imageproc",
  "openh264",
  "quick-xml",
- "rand 0.9.5",
+ "rand 0.10.2",
  "regex",
  "serde",
  "serde_json",
