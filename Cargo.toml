@@ -23,7 +23,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0"
 chrono = "0.4"
-base64 = "0.21"
+base64 = "0.23"
 # Every decoder except AVIF and OpenEXR, which are the only two that pull
 # heavy transitive dependencies (rav1e/ravif, exr). find_template accepts a
 # caller-supplied image, so the remaining formats stay enabled.
