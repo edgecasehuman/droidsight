@@ -1,0 +1,4 @@
+# Every file in this repository is text and is stored with LF. Without this,
+# a contributor whose Git has core.autocrlf disabled can commit CRLF and turn
+# an unrelated diff into a whole-file rewrite.
+* text=auto eol=lf

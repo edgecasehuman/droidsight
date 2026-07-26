@@ -1,0 +1,51 @@
+name: Security audit
+
+# Dependabot raises pull requests when a newer version exists. This job covers
+# the other direction: an advisory published against a version that is already
+# pinned here, which no dependency update would surface. The schedule is what
+# makes that useful, so it runs weekly as well as on dependency changes.
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/audit.yml"
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      # Exits non-zero for vulnerabilities only. Advisories of kind
+      # "unmaintained" are reported as warnings and do not fail the build,
+      # because they are not always actionable from here.
+      - name: Audit dependencies
+        run: cargo audit

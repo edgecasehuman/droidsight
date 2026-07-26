@@ -1,0 +1,40 @@
+{
+  "name": "@edgecasehuman/droidsight",
+  "version": "1.0.0",
+  "description": "An MCP server that drives a real Android device over ADB, with a continuous H.264 screen stream so screenshots return from cache instead of a fresh capture.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edgecasehuman/droidsight.git"
+  },
+  "homepage": "https://github.com/edgecasehuman/droidsight#readme",
+  "bugs": {
+    "url": "https://github.com/edgecasehuman/droidsight/issues"
+  },
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "android",
+    "adb",
+    "automation",
+    "llm"
+  ],
+  "bin": {
+    "droidsight": "bin/cli.js"
+  },
+  "files": [
+    "bin/cli.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@edgecasehuman/droidsight-linux-x64": "1.0.0",
+    "@edgecasehuman/droidsight-linux-arm64": "1.0.0",
+    "@edgecasehuman/droidsight-darwin-x64": "1.0.0",
+    "@edgecasehuman/droidsight-darwin-arm64": "1.0.0",
+    "@edgecasehuman/droidsight-win32-x64": "1.0.0"
+  }
+}

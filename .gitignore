@@ -1,0 +1,77 @@
+# Rust build output.
+/target
+target/
+
+# Generated per-platform npm packages and their copied binaries.
+/npm/dist/
+npm/dist/
+# README.md and LICENSE are copied into the launcher package at publish time.
+/npm/droidsight/README.md
+/npm/droidsight/LICENSE
+node_modules/
+
+# Secrets and local environment. Never commit these.
+.env
+.env.*
+*.pem
+*.key
+*.keystore
+*.jks
+
+# Coding-agent and editor working directories. These routinely contain absolute
+# local paths, transcripts, and machine names.
+.agent/
+.agents/
+.claude/
+.cursor/
+.aider*
+.instant-approve/
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*~
+
+# Device evidence. This server captures screenshots, UI hierarchies, logs, and
+# crash reports; none of it belongs in version control. Add a targeted `!`
+# exception below if documentation ever needs a committed image.
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.bmp
+*.mp4
+*.webm
+screenshots/
+*.xml
+window_dump*
+ui_dump*
+*.log
+logs/
+*.apk
+*.aab
+
+# Local build/test diagnostics and MCP runtime logs.
+build_err*.txt
+check_err.txt
+test_output.txt
+mcp_*.log
+*.bak
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Hardware-smoke transfer destination.
+.droidsight_probe_pull
+
+# Local scratch. Anything a contributor needs to keep out of a commit can live
+# under one of these without editing this file.
+scratch/
+tmp/
+temp/
+local/
+*.local
+*.orig
+*.rej

@@ -1,0 +1,197 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to build and publish (without a leading v)
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  resolve-version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # The dispatch input is interpolated through the environment rather than
+      # into the script body, so it cannot terminate the surrounding shell.
+      - id: pick
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_VERSION" ]; then
+            version="$INPUT_VERSION"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          case "$version" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::version '$version' is not a semantic version" >&2; exit 1 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # A tag that disagrees with the committed manifests would publish npm
+      # packages whose version does not match the binary inside them.
+      - name: Verify manifests match the release version
+        env:
+          VERSION: ${{ steps.pick.outputs.version }}
+        run: |
+          set -euo pipefail
+          status=0
+          check() {
+            if [ "$2" != "$VERSION" ]; then
+              echo "::error::$1 is $2, expected $VERSION" >&2
+              status=1
+            fi
+          }
+          check Cargo.toml \
+            "$(sed -n '/^\[package\]/,/^\[/p' Cargo.toml | sed -n 's/^version = "\(.*\)"/\1/p' | head -n 1)"
+          check server.json "$(node -p "require('./server.json').version")"
+          check "server.json packages[0]" "$(node -p "require('./server.json').packages[0].version")"
+          check npm/droidsight/package.json "$(node -p "require('./npm/droidsight/package.json').version")"
+          exit $status
+
+  build:
+    name: Build ${{ matrix.pkg }}
+    needs: resolve-version
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, runner: ubuntu-latest, pkg: linux-x64, bin: droidsight }
+          - { target: aarch64-unknown-linux-gnu, runner: ubuntu-24.04-arm, pkg: linux-arm64, bin: droidsight }
+          - { target: x86_64-apple-darwin, runner: macos-13, pkg: darwin-x64, bin: droidsight }
+          - { target: aarch64-apple-darwin, runner: macos-latest, pkg: darwin-arm64, bin: droidsight }
+          - { target: x86_64-pc-windows-msvc, runner: windows-latest, pkg: win32-x64, bin: droidsight.exe }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # openh264-sys2 assembles Cisco's decoder with NASM on every platform.
+      - uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Add target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --locked --release --bin droidsight --target ${{ matrix.target }}
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Assemble npm package
+        shell: bash
+        run: |
+          node npm/build-platform-package.mjs \
+            --pkg ${{ matrix.pkg }} \
+            --binary target/${{ matrix.target }}/release/${{ matrix.bin }} \
+            --version ${{ needs.resolve-version.outputs.version }}
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-${{ matrix.pkg }}
+          path: npm/dist/droidsight-${{ matrix.pkg }}
+          if-no-files-found: error
+
+      - name: Stage standalone archive
+        shell: bash
+        run: |
+          mkdir -p staging
+          cp target/${{ matrix.target }}/release/${{ matrix.bin }} staging/
+          cp LICENSE README.md staging/
+          tar -czf droidsight-${{ matrix.target }}.tar.gz -C staging .
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: archive-${{ matrix.pkg }}
+          path: droidsight-${{ matrix.target }}.tar.gz
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    needs: [resolve-version, build]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      # Required for npm trusted publishing, which mints a short-lived token and
+      # attaches a provenance attestation instead of using a long-lived secret.
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs a newer npm than the one bundled with Node 22.
+      # Without this the publish steps fail authentication, because there is
+      # deliberately no long-lived NPM_TOKEN to fall back to.
+      - name: Use an npm that supports trusted publishing
+        run: npm install -g npm@latest
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: artifacts
+
+      # Platform packages must exist on the registry before the wrapper that
+      # lists them as optionalDependencies, or the first install resolves nothing.
+      - name: Publish platform packages
+        run: |
+          for dir in artifacts/npm-*/; do
+            npm publish --access public --provenance "$dir"
+          done
+
+      - name: Publish launcher
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const path = 'npm/droidsight/package.json';
+            const manifest = JSON.parse(fs.readFileSync(path, 'utf8'));
+            const version = process.env.VERSION;
+            manifest.version = version;
+            for (const key of Object.keys(manifest.optionalDependencies)) {
+              manifest.optionalDependencies[key] = version;
+            }
+            fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n');
+          "
+          cp README.md LICENSE npm/droidsight/
+          npm publish --access public --provenance npm/droidsight
+
+      # The npm packages carry provenance attestations, but the standalone
+      # archives are unsigned and unattested. A published hash is the only
+      # integrity check someone downloading a tarball directly can perform.
+      - name: Record SHA-256 for the standalone archives
+        run: |
+          set -euo pipefail
+          sha256sum artifacts/archive-*/*.tar.gz \
+            | sed 's#artifacts/archive-[^/]*/##' > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ needs.resolve-version.outputs.version }}" \
+            --title "v${{ needs.resolve-version.outputs.version }}" \
+            --generate-notes \
+            artifacts/archive-*/*.tar.gz SHA256SUMS

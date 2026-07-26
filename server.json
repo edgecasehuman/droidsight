@@ -1,0 +1,77 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.edgecasehuman/droidsight",
+  "description": "Drives a real Android device over ADB. Keeps a continuous H.264 screen stream decoded in memory so screenshots return from cache, and reports the coordinate space of every image it returns.",
+  "repository": {
+    "url": "https://github.com/edgecasehuman/droidsight",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@edgecasehuman/droidsight",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "DROIDSIGHT_DEVICE_SERIAL",
+          "description": "The only Android target the process may use. Required when ADB reports more than one authorized device; the server refuses to guess.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "DROIDSIGHT_ADB_PATH",
+          "description": "Explicit path to the ADB executable. Falls back to ANDROID_SDK_ROOT, ANDROID_HOME, then PATH.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "DROIDSIGHT_LOCAL_ROOT",
+          "description": "Confines host paths used by APK installation and file push/pull. Defaults to the process working directory.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "DROIDSIGHT_DEVICE_PIN",
+          "description": "Numeric PIN for UI actions that require automatic unlock.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "DROIDSIGHT_ALLOW_SHELL",
+          "description": "Set to 1 to publish the arbitrary shell and macro tools. Grants authority equivalent to broad ADB shell access.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "DROIDSIGHT_DEBUG_LOG",
+          "description": "Path to a persistent debug log. File logging is otherwise disabled.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "DROIDSIGHT_LOG",
+          "description": "Tracing filter. Defaults to warn, or debug when a debug log path is set.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "DROIDSIGHT_EVENTS",
+          "description": "Starts the long-running device event monitor. Requires DROIDSIGHT_DEVICE_SERIAL.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "DROIDSIGHT_SENTINEL",
+          "description": "Set to 1 to start the background device-monitoring loop. Off by default because it performs periodic network work.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

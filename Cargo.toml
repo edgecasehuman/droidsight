@@ -1,0 +1,99 @@
+[package]
+name = "droidsight"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.89"
+license = "MIT"
+description = "An MCP server that drives a real Android device over ADB and attaches the resulting screen to every action, so an agent never needs a separate screenshot call. Single native binary, with OCR for screens the accessibility tree cannot read."
+repository = "https://github.com/edgecasehuman/droidsight"
+readme = "README.md"
+keywords = ["mcp", "android", "adb", "automation", "llm"]
+categories = ["command-line-utilities", "development-tools"]
+homepage = "https://github.com/edgecasehuman/droidsight"
+# The npm wrapper and CI definitions are not part of the crates.io artifact.
+exclude = ["/.github", "/npm"]
+
+[[bin]]
+name = "droidsight"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1.32", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+chrono = "0.4"
+base64 = "0.21"
+# Every decoder except AVIF and OpenEXR, which are the only two that pull
+# heavy transitive dependencies (rav1e/ravif, exr). find_template accepts a
+# caller-supplied image, so the remaining formats stay enabled.
+image = { version = "0.25", default-features = false, features = [
+    "bmp", "dds", "ff", "gif", "hdr", "ico", "jpeg", "png", "pnm", "qoi",
+    "tga", "tiff", "webp", "rayon",
+] }
+quick-xml = { version = "0.41", features = ["serialize"] }
+openh264 = "0.9"
+regex = "1.5"
+# Only rectangle drawing and template matching are used, so the default "text"
+# (font rasterisation) and "fft" features are left off.
+imageproc = { version = "0.27", default-features = false, features = ["rayon"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+async-trait = "0.1"
+rand = "0.9"
+unicode-normalization = "0.1"
+
+# Release binaries are downloaded per platform by the npm wrapper, so size and
+# startup cost matter more than compile time.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+# `strip` removes the symbol table and debug info, but panic locations from
+# dependencies are string literals in .rodata and survive it, so a release
+# binary still embeds the absolute path of every registry crate it panics from.
+# The profile key that would fix this, `trim-paths`, is not stabilized in Cargo
+# 1.97. Published binaries are built by the release workflow on hosted runners,
+# so they carry only runner paths; a binary built on a developer machine carries
+# that machine's paths and should not be distributed.
+
+# Enforced in CI. These are all clean today; the list exists so they stay that
+# way rather than being rediscovered as a cleanup pass later.
+[lints.clippy]
+cast_lossless = "deny"
+cloned_instead_of_copied = "deny"
+doc_markdown = "deny"
+enum_glob_use = "deny"
+explicit_iter_loop = "deny"
+flat_map_option = "deny"
+implicit_clone = "deny"
+inconsistent_struct_constructor = "deny"
+inefficient_to_string = "deny"
+manual_let_else = "deny"
+manual_midpoint = "deny"
+manual_string_new = "deny"
+map_unwrap_or = "deny"
+mut_mut = "deny"
+needless_bool = "deny"
+needless_raw_string_hashes = "deny"
+no_effect_underscore_binding = "deny"
+ptr_as_ptr = "deny"
+range_plus_one = "deny"
+redundant_closure_for_method_calls = "deny"
+redundant_else = "deny"
+ref_option_ref = "deny"
+semicolon_if_nothing_returned = "deny"
+single_char_pattern = "deny"
+single_match_else = "deny"
+stable_sort_primitive = "deny"
+string_add_assign = "deny"
+uninlined_format_args = "deny"
+unnecessary_box_returns = "deny"
+unnecessary_join = "deny"
+unnecessary_wraps = "deny"
+unnested_or_patterns = "deny"
+unreadable_literal = "deny"
+unused_async = "deny"
+verbose_bit_mask = "deny"

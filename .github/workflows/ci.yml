@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  host-checks:
+    name: Host checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # openh264-sys2 builds Cisco's C++ decoder from source and assembles its
+      # hot paths with NASM, which is not preinstalled on any runner image.
+      - name: Install NASM
+        uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      # rustup automatically installs the pinned compiler and components from
+      # rust-toolchain.toml when the first cargo command runs.
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      # Strict Clippy must run on every target platform. A Linux-only job does
+      # not observe imports that are used solely by cfg(unix) test modules.
+      - name: Run strict Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Run host-only tests
+        run: cargo test --locked -- --test-threads=1
+
+      - name: Build release binary
+        run: cargo build --locked --release --bin droidsight
