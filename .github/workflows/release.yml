@@ -22,7 +22,7 @@ jobs:
     outputs:
       version: ${{ steps.pick.outputs.version }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # The dispatch input is interpolated through the environment rather than
       # into the script body, so it cannot terminate the surrounding shell.
@@ -78,7 +78,7 @@ jobs:
           - { target: aarch64-apple-darwin, runner: macos-latest, pkg: darwin-arm64, bin: droidsight }
           - { target: x86_64-pc-windows-msvc, runner: windows-latest, pkg: win32-x64, bin: droidsight.exe }
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # openh264-sys2 assembles Cisco's decoder with NASM on every platform.
       - uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1
@@ -135,7 +135,7 @@ jobs:
       # attaches a provenance attestation instead of using a long-lived secret.
       id-token: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
