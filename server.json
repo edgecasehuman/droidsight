@@ -61,13 +61,13 @@
         },
         {
           "name": "DROIDSIGHT_EVENTS",
-          "description": "Starts the long-running device event monitor. Requires DROIDSIGHT_DEVICE_SERIAL.",
+          "description": "Set to 1 to start the long-running device event monitor. Requires DROIDSIGHT_DEVICE_SERIAL.",
           "isRequired": false,
           "isSecret": false
         },
         {
           "name": "DROIDSIGHT_SENTINEL",
-          "description": "Set to 1 to start the background device-monitoring loop. Off by default because it performs periodic network work.",
+          "description": "Set to 1 to start the background enforcement loop. It re-applies watched device state on a timer, including unlocking the screen. Off by default.",
           "isRequired": false,
           "isSecret": false
         }

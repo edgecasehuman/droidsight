@@ -173,7 +173,7 @@ element, and its `tap_element` action takes that `snapshot_id` and an `index`.
 | `DROIDSIGHT_ALLOW_SHELL=1` | Publishes the arbitrary shell and macro tools. This grants authority equivalent to broad ADB shell access. Off by default. |
 | `DROIDSIGHT_DEBUG_LOG` | Path to a persistent debug log. Logging to a file is strictly opt-in; without this, warnings go to stderr and no file is written. |
 | `DROIDSIGHT_LOG` | Tracing filter. Defaults to `warn`, or `debug` when a debug log path is set. |
-| `DROIDSIGHT_EVENTS` | Starts the long-running device event monitor. Requires `DROIDSIGHT_DEVICE_SERIAL`. |
+| `DROIDSIGHT_EVENTS=1` | Starts the long-running device event monitor. Requires `DROIDSIGHT_DEVICE_SERIAL`. |
 | `DROIDSIGHT_SENTINEL=1` | Starts the background enforcement loop described under [Background enforcement](#background-enforcement). Off by default: it re-applies device state on a timer, including unlocking the screen. |
 
 ## Continuous vision cache
@@ -316,7 +316,7 @@ cargo build --locked --release --bin droidsight
 
 These gates run on Linux, macOS, and Windows and pass without warning
 suppressions. The compiler is pinned in `rust-toolchain.toml`; a separate CI job
-verifies that the crate still builds on Rust 1.89, the declared minimum.
+type-checks the crate against Rust 1.89, the declared minimum.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before changing device-affecting code.
 [SECURITY.md](SECURITY.md) documents private reporting, sensitive-evidence

@@ -10,8 +10,9 @@ readme = "README.md"
 keywords = ["mcp", "android", "adb", "automation", "llm"]
 categories = ["command-line-utilities", "development-tools"]
 homepage = "https://github.com/edgecasehuman/droidsight"
-# The npm wrapper and CI definitions are not part of the crates.io artifact.
-exclude = ["/.github", "/npm"]
+# The npm wrapper, CI definitions, and MCP registry manifest are not part of
+# the crates.io artifact.
+exclude = ["/.github", "/npm", "/server.json"]
 
 [[bin]]
 name = "droidsight"

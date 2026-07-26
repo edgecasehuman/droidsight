@@ -44,7 +44,8 @@ node_modules/
 *.mp4
 *.webm
 screenshots/
-*.xml
+# UI hierarchy dumps carry on-screen text, so ignore them by name. A blanket
+# *.xml would also swallow any XML a contributor legitimately adds.
 window_dump*
 ui_dump*
 *.log

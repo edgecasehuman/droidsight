@@ -151,7 +151,8 @@ impl Drop for EventMonitor {
 static EVENT_MONITOR: Mutex<Option<EventMonitor>> = Mutex::new(None);
 
 fn ensure_event_monitor() {
-    if std::env::var("DROIDSIGHT_EVENTS").is_err() {
+    // An explicit "1", not mere presence: `DROIDSIGHT_EVENTS=0` has to mean off.
+    if std::env::var("DROIDSIGHT_EVENTS").as_deref() != Ok("1") {
         return;
     }
     let Some(serial) = crate::config::Config::device_serial() else {

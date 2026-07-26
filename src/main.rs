@@ -314,7 +314,8 @@ async fn async_main() -> Result<(), Box<dyn std::error::Error>> {
 
     // The sentinel re-applies watched device state on a timer, including
     // unlocking the screen, so it stays off unless explicitly requested.
-    if std::env::var("DROIDSIGHT_SENTINEL").is_ok() {
+    // An explicit "1", not mere presence: `DROIDSIGHT_SENTINEL=0` has to mean off.
+    if std::env::var("DROIDSIGHT_SENTINEL").as_deref() == Ok("1") {
         tracing::info!("Sentinel enabled via DROIDSIGHT_SENTINEL");
         tokio::spawn(async {
             sentinel::start_loop().await;
