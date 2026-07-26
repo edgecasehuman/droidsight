@@ -349,7 +349,11 @@ pub async fn swipe(
     let (cmd, mode) = if duration > 300 && dist > 200.0 {
         // Calculate curve points in a localized scope to ensure RNG drops before await
         let (bx1, by1, bx2, by2) = {
-            use rand::Rng;
+            // `RngExt`, not `Rng`: rand 0.10 renamed its own `Rng` to `RngExt` when
+            // `rand_core` took the `Rng` name for the low-level trait. `use rand::Rng`
+            // still compiles and still resolves, just to the core trait, which has no
+            // `random_range`.
+            use rand::RngExt;
             let mut rng = rand::rng();
 
             let mid_x = i32::midpoint(x1, x2);
