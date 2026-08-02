@@ -77,6 +77,12 @@ jobs:
 
           exit $status
 
+      # The supported platforms are enumerated in four places that nothing
+      # links together. Every disagreement between them ships and fails on a
+      # user's machine rather than here, so it is worth the two seconds.
+      - name: Verify the platform list agrees with itself
+        run: node npm/check-platform-consistency.mjs
+
   build:
     name: Build ${{ matrix.pkg }}
     needs: resolve-version

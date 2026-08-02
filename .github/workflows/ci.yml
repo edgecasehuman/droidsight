@@ -53,6 +53,21 @@ jobs:
       - name: Build release binary
         run: cargo build --locked --release --bin droidsight
 
+  # The npm wrapper is not exercised by the Rust suite at all, and the piece of
+  # it most likely to rot is the platform list, which is written out in four
+  # files that nothing links together. A tag would catch a disagreement, but by
+  # then the mistake is already the reason a release is being cut twice.
+  packaging:
+    name: Packaging consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify the platform list agrees with itself
+        run: node npm/check-platform-consistency.mjs
+
   # `rust-version` in Cargo.toml is published to crates.io as a compatibility
   # promise, and the pinned toolchain above is far newer than it. Without this
   # job the promise is never tested, and a dependency bump or a newly stabilized
