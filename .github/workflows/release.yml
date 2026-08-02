@@ -151,11 +151,54 @@ jobs:
         with:
           path: artifacts
 
+      # The npm packages carry provenance attestations, but the standalone
+      # archives are unsigned and unattested. A published hash is the only
+      # integrity check someone downloading a tarball directly can perform.
+      - name: Record SHA-256 for the standalone archives
+        run: |
+          set -euo pipefail
+          sha256sum artifacts/archive-*/*.tar.gz \
+            | sed 's#artifacts/archive-[^/]*/##' > SHA256SUMS
+          cat SHA256SUMS
+
+      # Deliberately ahead of the npm steps. npm can fail for reasons that have
+      # nothing to do with this repository — a trusted publisher not configured
+      # yet, a registry outage — and when the release was created afterwards,
+      # that failure spent the tag and shipped nothing at all. Attaching the
+      # archives first degrades the same failure to "binaries are up, npm is
+      # pending", which a re-run fixes. Re-runnable: uploads over an existing
+      # release rather than failing on it.
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              artifacts/archive-*/*.tar.gz SHA256SUMS --clobber
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes \
+              artifacts/archive-*/*.tar.gz SHA256SUMS
+          fi
+
       # Platform packages must exist on the registry before the wrapper that
       # lists them as optionalDependencies, or the first install resolves nothing.
+      # Each is skipped when that exact version is already up, so a run that died
+      # partway through the loop can be re-run without tripping EPUBLISHCONFLICT
+      # on the ones that already succeeded.
       - name: Publish platform packages
         run: |
+          set -euo pipefail
           for dir in artifacts/npm-*/; do
+            name=$(node -p "require('./${dir}package.json').name")
+            version=$(node -p "require('./${dir}package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version is already published, skipping"
+              continue
+            fi
             npm publish --access public --provenance "$dir"
           done
 
@@ -163,6 +206,7 @@ jobs:
         env:
           VERSION: ${{ needs.resolve-version.outputs.version }}
         run: |
+          set -euo pipefail
           node -e "
             const fs = require('node:fs');
             const path = 'npm/droidsight/package.json';
@@ -175,23 +219,9 @@ jobs:
             fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n');
           "
           cp README.md LICENSE npm/droidsight/
-          npm publish --access public --provenance npm/droidsight
-
-      # The npm packages carry provenance attestations, but the standalone
-      # archives are unsigned and unattested. A published hash is the only
-      # integrity check someone downloading a tarball directly can perform.
-      - name: Record SHA-256 for the standalone archives
-        run: |
-          set -euo pipefail
-          sha256sum artifacts/archive-*/*.tar.gz \
-            | sed 's#artifacts/archive-[^/]*/##' > SHA256SUMS
-          cat SHA256SUMS
-
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "v${{ needs.resolve-version.outputs.version }}" \
-            --title "v${{ needs.resolve-version.outputs.version }}" \
-            --generate-notes \
-            artifacts/archive-*/*.tar.gz SHA256SUMS
+          name=$(node -p "require('./npm/droidsight/package.json').name")
+          if npm view "$name@$VERSION" version >/dev/null 2>&1; then
+            echo "$name@$VERSION is already published, skipping"
+          else
+            npm publish --access public --provenance npm/droidsight
+          fi
