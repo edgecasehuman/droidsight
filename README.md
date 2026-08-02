@@ -335,15 +335,14 @@ coordinate metadata, Samsung keyguard/window parsing, and intent failure
 handling.
 
 The release binary has been exercised over wireless debugging against a single
-Samsung Galaxy A-series device running Android 13, covering device state,
-battery, apps, hierarchy and
-element snapshots, OCR, screenshots and sequences, continuous H.264 capture,
-input and navigation, intents, logs, notifications, Wi-Fi scanning, file round
-trips, hashing, sessions, gesture capture, recording, rotation restoration,
-crash listing, and cleanup. Destructive application, permission, accessibility,
-overlay, telephony, network-mutation, GPS, and battery-mocking operations are
-deliberately excluded from that matrix. Other vendors and Android releases still
-need their own qualification.
+Samsung device running Android 13, covering device state, battery, apps,
+hierarchy and element snapshots, OCR, screenshots and sequences, continuous
+H.264 capture, input and navigation, intents, logs, notifications, Wi-Fi
+scanning, file round trips, hashing, sessions, gesture capture, recording,
+rotation restoration, crash listing, and cleanup. Destructive application,
+permission, accessibility, overlay, telephony, network-mutation, GPS, and
+battery-mocking operations are deliberately excluded from that matrix. Other
+vendors and Android releases still need their own qualification.
 
 ## H.264 decoding
 
