@@ -124,6 +124,31 @@ pub(crate) trait AdbBackend: Send + Sync {
     async fn execute(&self, command: AdbCommand) -> Result<AdbCommandOutput>;
 }
 
+// Every tool in this server reaches the device through ADB, so a missing ADB is
+// the first thing a new install fails on and the only error most people will
+// ever see. The raw operating-system text for it is "program not found", which
+// names neither the program, nor where it was looked for, nor what to install —
+// and it reaches an agent, which cannot act on it either. This says all three,
+// in the same shape as the Tesseract guidance in vision.rs.
+fn adb_spawn_error(program: &str, error: &std::io::Error) -> anyhow::Error {
+    if error.kind() != std::io::ErrorKind::NotFound {
+        return anyhow!("failed to start ADB at '{program}': {error}");
+    }
+    anyhow!(
+        "the 'adb' executable was not found, so no device can be reached. \
+         droidsight needs it from the Android SDK platform-tools and does not \
+         bundle a copy.\n\n\
+         Tried to run: {program}\n\n\
+         Install platform-tools and make sure adb is on PATH:\n\
+         \x20 Windows  https://developer.android.com/tools/releases/platform-tools\n\
+         \x20 macOS    brew install --cask android-platform-tools\n\
+         \x20 Linux    apt install android-tools-adb\n\n\
+         Already have it? Point droidsight straight at it with DROIDSIGHT_ADB_PATH. \
+         ANDROID_SDK_ROOT and ANDROID_HOME are also checked, at \
+         <root>/platform-tools/adb."
+    )
+}
+
 pub(crate) struct TokioAdbBackend;
 
 #[async_trait]
@@ -135,7 +160,9 @@ impl AdbBackend for TokioAdbBackend {
             .kill_on_drop(true)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
-        let mut child = command.spawn()?;
+        let mut child = command
+            .spawn()
+            .map_err(|error| adb_spawn_error(&request.program, &error))?;
         let stdout = child
             .stdout
             .take()
@@ -332,22 +359,59 @@ fn normalized_adb_args(args: &[&str]) -> Vec<String> {
     }
 }
 
+// `adb devices` reports states whose remedies have nothing in common, and
+// reporting them all as "no authorized device" sends people to the wrong one.
+// `unauthorized` is the most common first-run state of all — the "Allow USB
+// debugging" prompt on the phone has not been accepted — and it is
+// indistinguishable from an empty USB port unless the state is passed back.
+fn no_authorized_device_error(rejected: &[(String, String)]) -> anyhow::Error {
+    if rejected.is_empty() {
+        return anyhow!(
+            "no devices are connected. Connect one over USB or pair it over \
+             Wi-Fi, and enable USB debugging in the device's Developer options. \
+             `adb devices` lists what ADB can currently see."
+        );
+    }
+
+    let seen = rejected
+        .iter()
+        .map(|(serial, status)| format!("{serial} ({status})"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let mut remedy = String::new();
+    if rejected.iter().any(|(_, status)| status == "unauthorized") {
+        remedy.push_str(
+            "\n\nA device is 'unauthorized': unlock its screen and accept the \
+             'Allow USB debugging' prompt. If none appears, revoke USB debugging \
+             authorizations in Developer options and reconnect it.",
+        );
+    }
+    if rejected.iter().any(|(_, status)| status == "offline") {
+        remedy.push_str(
+            "\n\nA device is 'offline': reconnect it, or run `adb kill-server` \
+             and retry.",
+        );
+    }
+    anyhow!("no authorized device. ADB reports: {seen}.{remedy}")
+}
+
 fn select_serial(devices_output: &[u8]) -> Result<String> {
     let out = str::from_utf8(devices_output)?;
     let mut devices = Vec::new();
+    let mut rejected = Vec::new();
     for line in out.lines().skip(1) {
-        if let Some((serial, status)) = line.split_once('\t') {
-            if status.split_whitespace().next() == Some("device") {
-                devices.push(serial.to_string());
-            }
-        } else if let Some((serial, status)) = line.split_once(' ') {
-            if status.split_whitespace().next() == Some("device") {
-                devices.push(serial.to_string());
-            }
+        let Some((serial, rest)) = line.split_once('\t').or_else(|| line.split_once(' ')) else {
+            continue;
+        };
+        match rest.split_whitespace().next() {
+            Some("device") => devices.push(serial.to_string()),
+            // A blank trailing field is `adb devices` padding, not a state.
+            Some(status) => rejected.push((serial.to_string(), status.to_string())),
+            None => {}
         }
     }
     match devices.as_slice() {
-        [] => Err(anyhow!("No authorized ADB device found")),
+        [] => Err(no_authorized_device_error(&rejected)),
         [serial] => Ok(serial.clone()),
         _ => Err(anyhow!(
             "Multiple ADB devices are connected; set DROIDSIGHT_DEVICE_SERIAL explicitly"
@@ -491,8 +555,8 @@ impl Adb {
 #[cfg(test)]
 mod tests {
     use super::{
-        normalized_adb_args, select_serial, shell_quote, Adb, AdbBackend, AdbCommand,
-        AdbCommandOutput, AdbRuntime,
+        adb_spawn_error, normalized_adb_args, select_serial, shell_quote, Adb, AdbBackend,
+        AdbCommand, AdbCommandOutput, AdbRuntime,
     };
     // These back the two tests below that drive a real child process through a
     // POSIX shell. Importing them unconditionally makes strict Clippy fail on
@@ -658,11 +722,40 @@ mod tests {
             .unwrap(),
             "ready"
         );
-        assert_eq!(
-            select_serial(b"List of devices attached\nlocked\tunauthorized\n")
-                .unwrap_err()
-                .to_string(),
-            "No authorized ADB device found"
+        assert!(select_serial(b"List of devices attached\nlocked\tunauthorized\n").is_err());
+    }
+
+    // The three ways this fails need three different things done about them, so
+    // each has to be distinguishable from the message alone.
+    #[test]
+    fn no_device_errors_name_the_state_and_its_remedy() {
+        let empty = select_serial(b"List of devices attached\n")
+            .unwrap_err()
+            .to_string();
+        assert!(empty.contains("no devices are connected"), "{empty}");
+        assert!(empty.contains("USB debugging"), "{empty}");
+        assert!(!empty.contains("unauthorized"), "invented a state: {empty}");
+
+        let unauthorized = select_serial(b"List of devices attached\nlocked\tunauthorized\n")
+            .unwrap_err()
+            .to_string();
+        assert!(
+            unauthorized.contains("locked (unauthorized)"),
+            "{unauthorized}"
+        );
+        assert!(
+            unauthorized.contains("Allow USB debugging"),
+            "did not name the prompt to accept: {unauthorized}"
+        );
+
+        let offline = select_serial(b"List of devices attached\nold offline\n")
+            .unwrap_err()
+            .to_string();
+        assert!(offline.contains("old (offline)"), "{offline}");
+        assert!(offline.contains("kill-server"), "{offline}");
+        assert!(
+            !offline.contains("Allow USB debugging"),
+            "offered the unauthorized remedy for an offline device: {offline}"
         );
     }
 
@@ -799,10 +892,9 @@ mod tests {
         ]));
         let runtime = AdbRuntime::new(backend.clone(), "test-adb".to_string(), None);
 
-        assert_eq!(
-            runtime.serial().await.unwrap_err().to_string(),
-            "No authorized ADB device found"
-        );
+        // The wording belongs to no_device_errors_name_the_state_and_its_remedy;
+        // what matters here is only that the first discovery failed.
+        assert!(runtime.serial().await.is_err());
         assert_eq!(runtime.serial().await.unwrap(), "connected");
         assert_eq!(backend.requests.lock().unwrap().len(), 2);
     }
@@ -931,5 +1023,61 @@ mod tests {
 
         assert!(error.to_string().contains("timed out"));
         assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    // The message a first-time install produces. It has to survive being read
+    // by someone who does not yet know what ADB is, and by an agent that has to
+    // relay a fix, so assert on the substance rather than the wording.
+    #[test]
+    fn missing_adb_explains_what_to_install_and_where_it_looked() {
+        let error = adb_spawn_error(
+            "adb",
+            &std::io::Error::new(std::io::ErrorKind::NotFound, "program not found"),
+        )
+        .to_string();
+
+        assert!(
+            error.contains("platform-tools"),
+            "no install target: {error}"
+        );
+        assert!(
+            error.contains("DROIDSIGHT_ADB_PATH"),
+            "no override named: {error}"
+        );
+        assert!(
+            error.contains("ANDROID_SDK_ROOT") && error.contains("ANDROID_HOME"),
+            "did not say where else it looks: {error}"
+        );
+        assert!(
+            error.contains("Tried to run: adb"),
+            "did not report what it tried: {error}"
+        );
+        for platform in ["Windows", "macOS", "Linux"] {
+            assert!(
+                error.contains(platform),
+                "no {platform} instruction: {error}"
+            );
+        }
+    }
+
+    // A permissions or exec-format failure is a different problem with a
+    // different fix, so it must not be answered with install instructions.
+    #[test]
+    fn other_spawn_failures_keep_their_own_cause() {
+        let error = adb_spawn_error(
+            "/opt/sdk/platform-tools/adb",
+            &std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permission denied"),
+        )
+        .to_string();
+
+        assert!(error.contains("permission denied"), "cause lost: {error}");
+        assert!(
+            error.contains("/opt/sdk/platform-tools/adb"),
+            "path lost: {error}"
+        );
+        assert!(
+            !error.contains("platform-tools and make sure"),
+            "misreported as a missing install: {error}"
+        );
     }
 }
