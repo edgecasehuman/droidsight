@@ -1,6 +1,7 @@
 {
   "name": "@edgecasehuman/droidsight",
   "version": "1.0.0",
+  "mcpName": "io.github.edgecasehuman/droidsight",
   "description": "An MCP server that drives a real Android device over ADB, with a continuous H.264 screen stream so screenshots return from cache instead of a fresh capture.",
   "license": "MIT",
   "repository": {
