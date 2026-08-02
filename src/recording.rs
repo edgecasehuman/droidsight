@@ -8,7 +8,7 @@ static RECORDING_PID: Mutex<Option<u32>> = Mutex::const_new(None);
 pub async fn start_recording() -> Result<Value, Value> {
     let mut recording_pid = RECORDING_PID.lock().await;
     if let Some(pid) = *recording_pid {
-        if Adb::shell_native(&format!("kill -0 {pid}")).await.is_ok() {
+        if Adb::device_shell(&format!("kill -0 {pid}")).await.is_ok() {
             return Err(
                 json!({"code": -32000, "message": format!("Recording is already running with PID {}", pid)}),
             );
@@ -16,7 +16,7 @@ pub async fn start_recording() -> Result<Value, Value> {
         *recording_pid = None;
     }
 
-    let output = Adb::shell_native(
+    let output = Adb::device_shell(
         "screenrecord --time-limit 180 /sdcard/mcp_rec.mp4 >/dev/null 2>&1 & echo $!",
     )
     .await
@@ -36,7 +36,7 @@ pub async fn stop_recording() -> Result<Value, Value> {
     let pid = (*recording_pid).ok_or_else(
         || json!({"code": -32000, "message": "No recording owned by this server is running"}),
     )?;
-    if let Err(error) = Adb::shell_native(&format!("kill -2 {pid}")).await {
+    if let Err(error) = Adb::device_shell(&format!("kill -2 {pid}")).await {
         return Err(
             json!({"code": -32000, "message": format!("Failed to stop recording PID {}: {}", pid, error)}),
         );

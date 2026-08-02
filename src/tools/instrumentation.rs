@@ -59,7 +59,7 @@ impl Tool for AppInstrumentationTool {
                 // Returns the raw `dumpsys activity <package>` output, which can
                 // be large; the diagnostic response applies a byte budget.
                 let cmd = format!("dumpsys activity {}", crate::adb::shell_quote(package));
-                match Adb::shell_native(&cmd).await {
+                match Adb::device_shell(&cmd).await {
                     Ok(out) => diagnostic_response(out),
                     Err(e) => response::error_response(e.to_string()),
                 }
@@ -67,7 +67,7 @@ impl Tool for AppInstrumentationTool {
             "dump_window" => {
                 // Fast focus check: dumpsys window windows filtered to the
                 // current/focused window fields (see WINDOW_FOCUS_COMMAND).
-                match Adb::shell_native(WINDOW_FOCUS_COMMAND).await {
+                match Adb::device_shell(WINDOW_FOCUS_COMMAND).await {
                     Ok(out) => diagnostic_response(out),
                     Err(e) => response::error_response(e.to_string()),
                 }
@@ -79,7 +79,7 @@ impl Tool for AppInstrumentationTool {
                 } else {
                     "ps -A".to_string()
                 };
-                match Adb::shell_native(&cmd).await {
+                match Adb::device_shell(&cmd).await {
                     Ok(out) => diagnostic_response(out),
                     Err(e) => response::error_response(e.to_string()),
                 }
@@ -91,12 +91,12 @@ impl Tool for AppInstrumentationTool {
                     // the traces file. Reading /data/anr is often restricted, so
                     // the read may fail even after the signal is delivered.
                     let sig_cmd = format!("kill -3 {pid}");
-                    let _ = Adb::shell_native(&sig_cmd).await;
+                    let _ = Adb::device_shell(&sig_cmd).await;
 
                     // Give the runtime time to write the trace.
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-                    match Adb::shell_native("cat /data/anr/traces.txt").await {
+                    match Adb::device_shell("cat /data/anr/traces.txt").await {
                         Ok(out) => diagnostic_response(out),
                         Err(e) => response::error_response(format!(
                             "Signal sent, but failed to read traces (Permission Hint?): {e}"

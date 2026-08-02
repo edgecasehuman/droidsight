@@ -219,7 +219,7 @@ pub async fn tap_with_source(
     // gap between the press and the release. `input tap` emits the pair almost
     // simultaneously, which some view-level gesture detectors discard as too
     // brief to be a touch.
-    match Adb::shell_native(&format!("input swipe {fx} {fy} {fx} {fy} 75")).await {
+    match Adb::device_shell(&format!("input swipe {fx} {fy} {fx} {fy} 75")).await {
         Ok(_) => {
             make_smart_response(
                 stream_manager,
@@ -271,7 +271,7 @@ pub async fn text_with_mode(
     // Clipboard preserves full Unicode. Never silently transliterate an auto/unicode
     // request when clipboard access is denied: that would corrupt user data.
     crate::notifications::set_clipboard(s).await?;
-    Adb::shell_native("input keyevent KEYCODE_PASTE").await
+    Adb::device_shell("input keyevent KEYCODE_PASTE").await
         .map_err(|error| json!({"code":-32000,"message":format!("Clipboard was set but paste failed: {error}")}))?;
     make_smart_response(
         stream_manager,
@@ -283,7 +283,7 @@ pub async fn text_with_mode(
 pub async fn text(stream_manager: &Arc<StreamManager>, s: &str) -> ToolResult {
     let typed = ascii_typeable(s);
     let escaped = typed.replace(' ', "%s");
-    match Adb::shell_native(&format!("input text {}", crate::adb::shell_quote(&escaped))).await {
+    match Adb::device_shell(&format!("input text {}", crate::adb::shell_quote(&escaped))).await {
         Ok(_) => {
             let message = if typed == s {
                 "Input text sent".to_string()
@@ -310,9 +310,9 @@ pub async fn key(stream_manager: &Arc<StreamManager>, keycode: &str, force: bool
         // Try key event AND fallback swipe (Left Edge Back Gesture)
         cmd_log.push_str(" (Force+Swipe)");
         let cmd = format!("input keyevent {keycode} && input swipe 0 1000 500 1000 200");
-        Adb::shell_native(&cmd).await
+        Adb::device_shell(&cmd).await
     } else {
-        Adb::shell_native(&format!("input keyevent {keycode}")).await
+        Adb::device_shell(&format!("input keyevent {keycode}")).await
     };
 
     match result {
@@ -398,7 +398,7 @@ pub async fn swipe(
     };
 
     // Execute the determined command
-    match Adb::shell_native(&cmd).await {
+    match Adb::device_shell(&cmd).await {
         Ok(_) => {
             make_smart_response(
                 stream_manager,
@@ -414,7 +414,7 @@ pub async fn swipe(
 }
 
 pub async fn set_ime(stream_manager: &Arc<StreamManager>, ime_id: &str) -> ToolResult {
-    match Adb::shell_native(&format!("ime set {}", crate::adb::shell_quote(ime_id))).await {
+    match Adb::device_shell(&format!("ime set {}", crate::adb::shell_quote(ime_id))).await {
         Ok(_) => make_smart_response(stream_manager, vec![format!("Set IME: {}", ime_id)]).await,
         Err(e) => response::error_response(e.to_string()),
     }
@@ -438,7 +438,7 @@ pub async fn tap_raw(x: i32, y: i32, source: CoordinateSource) -> ToolResult {
     let (fx, fy) = metrics.clamp_to_screen(tx, ty);
 
     // Use swipe with 75ms duration to simulate a human tap
-    match Adb::shell_native(&format!("input swipe {fx} {fy} {fx} {fy} 75")).await {
+    match Adb::device_shell(&format!("input swipe {fx} {fy} {fx} {fy} 75")).await {
         Ok(_) => response::text_response(format!("Tapped (Humanized) {fx} {fy}")),
         Err(e) => response::error_response(e.to_string()),
     }

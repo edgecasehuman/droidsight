@@ -101,9 +101,9 @@ async fn structured_state(stream: &std::sync::Arc<crate::stream::StreamManager>)
         Err(e) => return response::error_response(e.to_string()),
     };
     let (display_result, power_result, windows_result, keyboard_result) = tokio::join!(
-        crate::adb::Adb::shell_native("wm size"),
-        crate::adb::Adb::shell_native("dumpsys power"),
-        crate::adb::Adb::shell_native("dumpsys window windows"),
+        crate::adb::Adb::device_shell("wm size"),
+        crate::adb::Adb::device_shell("dumpsys power"),
+        crate::adb::Adb::device_shell("dumpsys window windows"),
         crate::device_metrics::detect_keyboard_state(),
     );
     let mut warnings = Vec::new();

@@ -37,7 +37,7 @@ impl DisplayMetrics {
             return Ok(cached);
         }
 
-        let size_output = Adb::shell_native("wm size")
+        let size_output = Adb::device_shell("wm size")
             .await
             .map_err(|e| anyhow!("Failed to get display size: {e}"))?;
 
@@ -117,7 +117,7 @@ pub struct KeyboardState {
 /// Uses `dumpsys input_method` to check IME state
 pub async fn detect_keyboard_state() -> anyhow::Result<KeyboardState> {
     // Run dumpsys input_method to get keyboard info
-    let output = match Adb::shell_native(
+    let output = match Adb::device_shell(
         "dumpsys input_method | grep -E 'mInputShown|mShowRequested|mVisibleHeight'",
     )
     .await

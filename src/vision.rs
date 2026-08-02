@@ -249,10 +249,10 @@ fn parse_hierarchy_xml(xml_content: &str) -> AnyhowResult<UiNode> {
 }
 
 pub async fn fetch_parsed_hierarchy() -> AnyhowResult<UiNode> {
-    Adb::shell_native("uiautomator dump")
+    Adb::device_shell("uiautomator dump")
         .await
         .map_err(|error| anyhow!("Dump failed: {error}"))?;
-    let xml_content = Adb::shell_native("cat /sdcard/window_dump.xml")
+    let xml_content = Adb::device_shell("cat /sdcard/window_dump.xml")
         .await
         .map_err(|error| anyhow!("Read failed: {error}"))?;
     parse_hierarchy_xml(&xml_content)

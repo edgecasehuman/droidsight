@@ -17,7 +17,7 @@ pub fn stop_session() -> ToolResult {
 pub async fn run_macro(commands: Vec<String>) -> ToolResult {
     let mut results = Vec::new();
     for (index, cmd) in commands.into_iter().enumerate() {
-        match Adb::shell(&["shell", &cmd]).await {
+        match Adb::device_shell(&cmd).await {
             Ok(out) => results.push(format!("Command {} output:\n{}", index + 1, out)),
             Err(e) => {
                 return response::error_response(format!(

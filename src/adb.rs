@@ -302,10 +302,21 @@ impl AdbRuntime {
     }
 
     async fn shell_output(&self, args: &[&str]) -> Result<AdbCommandOutput> {
+        self.run(normalized_adb_args(args)).await
+    }
+
+    /// Run one device shell command verbatim, bypassing argument quoting.
+    async fn device_shell(&self, cmd: &str) -> Result<String> {
+        let output = self.run(vec!["shell".to_string(), cmd.to_string()]).await?;
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    }
+
+    /// The one place an ADB subprocess is launched. Callers have already
+    /// decided the exact argument vector; nothing here rewrites it.
+    async fn run(&self, args: Vec<String>) -> Result<AdbCommandOutput> {
         let serial = self.serial().await?;
-        let normalized_args = normalized_adb_args(args);
         let mut final_args = vec!["-s".to_string(), serial.clone()];
-        final_args.extend(normalized_args);
+        final_args.extend(args);
         Adb::log_cmd(&final_args.iter().map(String::as_str).collect::<Vec<_>>());
 
         let result = self
@@ -344,19 +355,32 @@ pub fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
 }
 
+/// Rewrite an argument vector into the single command string `adb shell`
+/// actually evaluates on the device.
+///
+/// ADB does not preserve argument boundaries: it joins everything after
+/// `shell` with spaces and hands the result to the device's shell. An
+/// unquoted value therefore escapes its argument as easily as it would in
+/// `sh -c`. Every argument is quoted here, so no caller of `Adb::shell` can
+/// reach the device shell as anything but one literal word.
+///
+/// Commands that are *meant* to be interpreted — pipelines, `&&`, the
+/// deliberately unfiltered shell tools — go through `Adb::device_shell`,
+/// which never reaches this function.
 fn normalized_adb_args(args: &[&str]) -> Vec<String> {
-    if args.first() == Some(&"shell") && args.len() > 2 {
-        vec![
-            "shell".to_string(),
-            args[1..]
-                .iter()
-                .map(|arg| shell_quote(arg))
-                .collect::<Vec<_>>()
-                .join(" "),
-        ]
-    } else {
-        args.iter().map(|arg| (*arg).to_string()).collect()
+    let Some(("shell", rest)) = args.split_first().map(|(head, rest)| (*head, rest)) else {
+        return args.iter().map(|arg| (*arg).to_string()).collect();
+    };
+    if rest.is_empty() {
+        return vec!["shell".to_string()];
     }
+    vec![
+        "shell".to_string(),
+        rest.iter()
+            .map(|arg| shell_quote(arg))
+            .collect::<Vec<_>>()
+            .join(" "),
+    ]
 }
 
 // `adb devices` reports states whose remedies have nothing in common, and
@@ -455,6 +479,11 @@ impl Adb {
     }
 
     /// Executes an ADB command and returns stdout as a string.
+    ///
+    /// When the first element is `shell`, every element after it is quoted
+    /// into one device-shell word, so an argument carrying `;` or `|` cannot
+    /// become a second command. Prefer this form. A command string that has
+    /// to be interpreted by the device shell belongs in `device_shell`.
     pub async fn shell(args: &[&str]) -> Result<String> {
         Self::runtime().shell(args).await
     }
@@ -502,18 +531,24 @@ impl Adb {
         )
     }
 
-    /// Executes an ADB shell command on the connected device.
-    pub async fn device_shell(cmd: &str) -> Result<String> {
-        Self::shell(&["shell", cmd]).await
-    }
-
-    /// Execute a remote shell command through the canonical subprocess path.
+    /// Execute one command string on the device shell, **unquoted**.
     ///
-    /// Despite the name, this does not use the raw `shell:` ADB service. That
-    /// service does not expose the remote exit status, so a failed command
-    /// would be reported as a successful tool call.
-    pub async fn shell_native(cmd: &str) -> Result<String> {
-        Self::shell(&["shell", cmd]).await
+    /// The string is evaluated by the device's shell exactly as written, so
+    /// redirection, pipelines, and `;` all take effect. That is the point:
+    /// this is the path for commands that genuinely need shell syntax, and
+    /// for the deliberately unfiltered `run_shell` and `run_macro` tools.
+    ///
+    /// It is also the only way to reach the device shell without quoting, so
+    /// any value interpolated into `cmd` that did not come from this crate
+    /// must be wrapped in [`shell_quote`] first. When the command is a fixed
+    /// program with separate arguments, use [`Adb::shell`] instead and let it
+    /// do the quoting.
+    ///
+    /// This deliberately does not use the raw `shell:` ADB service, which
+    /// does not expose the remote exit status; a failed command would be
+    /// reported as a successful tool call.
+    pub async fn device_shell(cmd: &str) -> Result<String> {
+        Self::runtime().device_shell(cmd).await
     }
 
     /// Execute a remote command over the raw ADB exec service and return its
@@ -704,12 +739,51 @@ mod tests {
             vec!["shell", "'pm' 'clear' 'pkg; reboot'"]
         );
         assert_eq!(
-            normalized_adb_args(&["shell", "echo $HOME | wc -c"]),
-            vec!["shell", "echo $HOME | wc -c"]
-        );
-        assert_eq!(
             normalized_adb_args(&["install", "-r", "some app.apk"]),
             vec!["install", "-r", "some app.apk"]
+        );
+    }
+
+    // Quoting used to begin at the third element, so `&["shell", value]` --
+    // the shape a single-argument command naturally takes -- reached the
+    // device shell verbatim. Nothing exploited it, but the difference between
+    // a safe call and an injectable one was the length of an array literal,
+    // which is not something a reviewer can be expected to notice. The raw
+    // form now has to be requested by name through `Adb::device_shell`.
+    #[test]
+    fn a_lone_remote_shell_argument_is_quoted_like_any_other() {
+        assert_eq!(
+            normalized_adb_args(&["shell", "echo $HOME | wc -c"]),
+            vec!["shell", "'echo $HOME | wc -c'"]
+        );
+        assert_eq!(
+            normalized_adb_args(&["shell", "/sdcard/x; rm -rf /sdcard/*"]),
+            vec!["shell", "'/sdcard/x; rm -rf /sdcard/*'"]
+        );
+    }
+
+    // `ls` and `cat` take a caller-supplied device path, and `mcp_android_file_system`
+    // publishes both without the shell gate. If that path were not quoted, the
+    // tool would be a general-purpose device shell under another name.
+    #[tokio::test]
+    async fn caller_supplied_device_paths_cannot_start_a_second_command() {
+        let backend = MockBackend::output(b"");
+        let _ = Adb::shell_with_backend(
+            &backend,
+            "test-adb".to_string(),
+            "serial-1".to_string(),
+            &["shell", "ls", "-la", "/sdcard; reboot"],
+        )
+        .await;
+
+        assert_eq!(
+            backend.requests.lock().unwrap()[0].args,
+            vec![
+                "-s".to_string(),
+                "serial-1".to_string(),
+                "shell".to_string(),
+                "'ls' '-la' '/sdcard; reboot'".to_string(),
+            ]
         );
     }
 

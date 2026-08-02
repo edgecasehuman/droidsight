@@ -21,7 +21,7 @@ pub async fn set_clipboard(text: &str) -> ToolResult {
         crate::adb::shell_quote(text)
     );
 
-    let result = Adb::shell(&["shell", &cmd]).await;
+    let result = Adb::device_shell(&cmd).await;
     let output = match &result {
         Ok(s) => s.as_str(),
         Err(e) => return response::error_response(e.to_string()),
@@ -39,7 +39,7 @@ pub async fn set_clipboard(text: &str) -> ToolResult {
 
 pub async fn get_clipboard() -> ToolResult {
     let cmd_std = "service call clipboard 1";
-    let result = Adb::shell(&["shell", cmd_std]).await;
+    let result = Adb::device_shell(cmd_std).await;
 
     let output = match &result {
         Ok(s) => s.clone(),
@@ -52,7 +52,7 @@ pub async fn get_clipboard() -> ToolResult {
         || output.contains("security exception")
     {
         // Try Samsung-specific fallback
-        match Adb::shell(&["shell", "service call semclipboard 1"]).await {
+        match Adb::device_shell("service call semclipboard 1").await {
             Ok(sem_out)
                 if !sem_out.contains("Parcel(00000000    '....')")
                     && !sem_out.contains("Permission Denial") =>

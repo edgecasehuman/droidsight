@@ -20,12 +20,34 @@ Changes should preserve these boundaries unless the proposal explicitly and
 carefully changes them:
 
 - device selection must fail safely when the target is ambiguous;
-- arbitrary shell execution remains opt-in;
+- arbitrary shell execution remains opt-in, and no other tool is a way around
+  it;
 - host file access remains confined to configured roots;
 - external commands have deadlines and owned cleanup;
 - MCP and subprocess output is bounded where it can be large;
 - stderr is used for diagnostics so stdout remains valid MCP transport; and
 - ordinary tests do not require or mutate a connected Android device.
+
+## Reaching the device shell
+
+`adb shell` does not preserve argument boundaries. It joins everything after
+`shell` with spaces and hands one string to the device's shell, so an unquoted
+value escapes its argument exactly as it would in `sh -c`. A tool that passes a
+caller-supplied package name or path through unquoted is a general-purpose
+device shell wearing another name, which would make the `DROIDSIGHT_ALLOW_SHELL`
+gate meaningless.
+
+There are two ways to run something on the device, and the choice is the whole
+of the defense:
+
+- `Adb::shell(&["shell", program, arg, ...])` quotes every element after
+  `shell`. **Use this.** Anything a caller supplied stays one literal word no
+  matter what it contains.
+- `Adb::device_shell(command)` evaluates the string verbatim, so pipelines,
+  redirection, and `;` work. It exists for commands that genuinely need shell
+  syntax and for the opt-in `run_shell` and `run_macro` tools. Any value
+  interpolated into it that did not come from this crate must be wrapped in
+  `adb::shell_quote` first.
 
 ## Development checks
 

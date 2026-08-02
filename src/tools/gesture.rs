@@ -68,7 +68,7 @@ impl Tool for RecordGestureTool {
         // toybox to bound the recording.
         let final_cmd = bounded_recording_command(duration, &cmd);
 
-        let output = match Adb::shell_native(&final_cmd).await {
+        let output = match Adb::device_shell(&final_cmd).await {
             Ok(o) => o,
             Err(e) => return response::error_response(format!("Recording failed: {e}")),
         };
@@ -303,7 +303,7 @@ impl Tool for PlayGestureTool {
 
         // Run
         let final_res =
-            match Adb::shell_native(&format!("sh {}", crate::adb::shell_quote(&script_path))).await
+            match Adb::device_shell(&format!("sh {}", crate::adb::shell_quote(&script_path))).await
             {
                 Ok(out) => response::bounded_text_response(
                     format!("Playback Complete:\n{out}"),
@@ -314,7 +314,7 @@ impl Tool for PlayGestureTool {
             };
 
         // Cleanup remote
-        let _ = Adb::shell_native(&format!(
+        let _ = Adb::device_shell(&format!(
             "rm -f -- {}",
             crate::adb::shell_quote(&script_path)
         ))

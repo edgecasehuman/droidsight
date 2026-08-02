@@ -54,7 +54,7 @@ pub async fn run_shell(command: &str) -> ToolResult {
     if command.trim().is_empty() {
         return response::error_response("command must not be empty");
     }
-    match Adb::shell(&["shell", command]).await {
+    match Adb::device_shell(command).await {
         Ok(output) => response::bounded_text_response(
             output,
             response::DEFAULT_TEXT_BUDGET_BYTES,
@@ -104,7 +104,7 @@ pub async fn is_locked() -> bool {
     // Fetch policy and parse in Rust to avoid grep exit-code ambiguity. Android
     // vendors expose both legacy one-line fields and the newer indented
     // KeyguardServiceDelegate / KeyguardStateMonitor state.
-    match Adb::shell(&["shell", "dumpsys window policy"]).await {
+    match Adb::device_shell("dumpsys window policy").await {
         Ok(output) => policy_reports_locked(&output),
         Err(e) => {
             tracing::warn!("Error checking lock state: {}", e);
@@ -130,7 +130,7 @@ fn policy_reports_locked(output: &str) -> bool {
 
 pub async fn unlock_device(pin: Option<String>) -> ToolResult {
     // Method A: parallel wake and keyguard dismiss in a single shell call.
-    let _ = Adb::shell(&["shell", "input keyevent 224 & wm dismiss-keyguard"]).await;
+    let _ = Adb::device_shell("input keyevent 224 & wm dismiss-keyguard").await;
 
     // Quick verification that the screen turned on.
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -176,7 +176,7 @@ pub async fn unlock_device(pin: Option<String>) -> ToolResult {
 
             // Fast path: inject all keycodes in one `cmd input` call.
             let cmd = format!("cmd input keyevent {}", keycodes.join(" "));
-            match Adb::shell(&["shell", &cmd]).await {
+            match Adb::device_shell(&cmd).await {
                 Ok(_) => {}
                 Err(_) => {
                     // Fallback: send them one at a time via `input keyevent`.

@@ -132,7 +132,7 @@ pub async fn crash_log(package: &str) -> ToolResult {
         "dumpsys dropbox data_app_crash --print | grep -F -A 20 -- {}",
         crate::adb::shell_quote(package)
     );
-    match Adb::shell(&["shell", &cmd]).await {
+    match Adb::device_shell(&cmd).await {
         Ok(output) => crash_log_response(output),
         Err(e) => response::error_response(e.to_string()),
     }
@@ -204,7 +204,7 @@ pub async fn get_foreground_app() -> ToolResult {
     for i in 0..3 {
         // Method 1: dumpsys window windows (Parse mCurrentFocus)
         // We execute without grep to avoid exit code 1 if not found immediately
-        if let Ok(output) = Adb::shell(&["shell", "dumpsys window windows"]).await {
+        if let Ok(output) = Adb::device_shell("dumpsys window windows").await {
             for line in output.lines() {
                 let line = line.trim();
                 if line.starts_with("mCurrentFocus=")
@@ -223,7 +223,7 @@ pub async fn get_foreground_app() -> ToolResult {
         }
 
         // Method 2: dumpsys activity activities (Parse mResumedActivity)
-        if let Ok(output) = Adb::shell(&["shell", "dumpsys activity activities"]).await {
+        if let Ok(output) = Adb::device_shell("dumpsys activity activities").await {
             for line in output.lines() {
                 let line = line.trim();
                 if line.starts_with("mResumedActivity:") || line.starts_with("topResumedActivity=")

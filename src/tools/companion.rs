@@ -55,7 +55,7 @@ impl Tool for CompanionTool {
                     crate::adb::shell_quote(text),
                 );
 
-                match Adb::shell_native(&cmd).await {
+                match Adb::device_shell(&cmd).await {
                     Ok(out) => {
                         if out.contains("Error") || out.contains("exception") {
                             response::error_response(format!(
@@ -82,7 +82,7 @@ impl Tool for CompanionTool {
                     crate::adb::shell_quote("droidsight"),
                     crate::adb::shell_quote(text),
                 );
-                let _ = Adb::shell_native(&cmd).await;
+                let _ = Adb::device_shell(&cmd).await;
                 response::text_response("Toast (simulated via Notification) sent")
             }
             "show_url" => {
@@ -95,7 +95,7 @@ impl Tool for CompanionTool {
                     "am start -a android.intent.action.VIEW -d {}",
                     crate::adb::shell_quote(url)
                 );
-                match Adb::shell_native(&cmd).await {
+                match Adb::device_shell(&cmd).await {
                     Ok(out) => response::bounded_text_response(
                         format!("Browser launched: {out}"),
                         response::DEFAULT_TEXT_BUDGET_BYTES,
