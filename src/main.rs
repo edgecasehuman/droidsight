@@ -245,7 +245,71 @@ fn register_tools() -> Arc<tools::ToolRegistry> {
     Arc::new(registry)
 }
 
+/// What the process should do, decided before any server state exists.
+enum Startup {
+    Serve,
+    Print(String),
+}
+
+fn version_line() -> String {
+    format!("droidsight {}", env!("CARGO_PKG_VERSION"))
+}
+
+fn help_text() -> String {
+    format!(
+        "{}\n\
+         An MCP server that drives a real Android device over ADB.\n\
+         \n\
+         Usage:\n\
+         \x20 droidsight            Serve MCP on stdin/stdout as newline-delimited JSON-RPC 2.0\n\
+         \x20 droidsight --version  Print the version and exit\n\
+         \x20 droidsight --help     Print this message and exit\n\
+         \n\
+         There are no other command-line options. Every setting is an environment\n\
+         variable, and DROIDSIGHT_DEVICE_SERIAL is the one most setups need. The\n\
+         full list is in the README:\n\
+         https://github.com/edgecasehuman/droidsight",
+        version_line()
+    )
+}
+
+// An MCP client spawns this binary with no arguments and immediately speaks
+// JSON-RPC on stdin, so argument handling exists entirely for the other caller:
+// a person at a terminal who has just installed it and wants to know that it
+// works. `npx @edgecasehuman/droidsight --version` is the first thing most of
+// them run. Without this, that command starts a server that blocks on stdin
+// forever and prints nothing, which is indistinguishable from a broken install.
+//
+// The first argument decides, and anything unrecognized is refused rather than
+// ignored, so a typo is reported instead of silently starting a server the
+// caller did not ask for. Since neither flag takes a value and there are no
+// others, whatever follows the first argument cannot change the answer.
+fn parse_cli(args: impl IntoIterator<Item = String>) -> Result<Startup, String> {
+    let Some(argument) = args.into_iter().next() else {
+        return Ok(Startup::Serve);
+    };
+    match argument.as_str() {
+        "--version" | "-V" => Ok(Startup::Print(version_line())),
+        "--help" | "-h" => Ok(Startup::Print(help_text())),
+        other => Err(format!("unrecognized argument: {other}\n\n{}", help_text())),
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Ahead of tracing setup, so that --version and --help cannot create a log
+    // file as a side effect of being asked a question.
+    match parse_cli(std::env::args().skip(1)) {
+        Ok(Startup::Print(text)) => {
+            println!("{text}");
+            return Ok(());
+        }
+        Ok(Startup::Serve) => {}
+        Err(message) => {
+            eprintln!("droidsight: {message}");
+            std::process::exit(2);
+        }
+    }
+
     // Configure tracing without polluting stdout, which is reserved for MCP.
     let pid = std::process::id();
     let default_log_name = format!("mcp_{pid}.log");
@@ -1165,5 +1229,56 @@ mod protocol_tests {
         assert!(tools::app::AppManageTool.needs_unlock(&json!({"action": "launch"})));
         assert!(!tools::app::AppManageTool.needs_unlock(&json!({"action": "list"})));
         assert!(!tools::system::SystemControlTool.needs_unlock(&json!({"action": "set_overlay"})));
+    }
+
+    fn cli(args: &[&str]) -> Result<Startup, String> {
+        parse_cli(args.iter().map(|argument| (*argument).to_owned()))
+    }
+
+    #[test]
+    fn no_arguments_serves() {
+        assert!(matches!(cli(&[]), Ok(Startup::Serve)));
+    }
+
+    #[test]
+    fn version_and_help_flags_print_and_do_not_serve() {
+        for flag in ["--version", "-V"] {
+            let Ok(Startup::Print(text)) = cli(&[flag]) else {
+                panic!("{flag} did not print");
+            };
+            assert_eq!(text, format!("droidsight {}", env!("CARGO_PKG_VERSION")));
+        }
+        for flag in ["--help", "-h"] {
+            let Ok(Startup::Print(text)) = cli(&[flag]) else {
+                panic!("{flag} did not print");
+            };
+            assert!(text.contains("Usage:"), "{flag} printed no usage");
+            assert!(
+                text.contains("DROIDSIGHT_DEVICE_SERIAL"),
+                "{flag} omitted the setting most setups need"
+            );
+        }
+    }
+
+    // A typo must not fall through to a server that blocks on stdin, which is
+    // the failure this argument handling exists to prevent in the first place.
+    #[test]
+    fn unrecognized_arguments_are_refused_with_usage() {
+        for argument in ["--verison", "--serial=X", "-x", "serve"] {
+            let Err(message) = cli(&[argument]) else {
+                panic!("{argument} was accepted");
+            };
+            assert!(message.contains(argument), "{argument} was not named back");
+            assert!(message.contains("Usage:"), "{argument} printed no usage");
+        }
+    }
+
+    // The launcher, the manifests, and the release workflow all agree on one
+    // version; --version is the only place a human checks it, so it reads from
+    // the same crate metadata rather than a second literal that could drift.
+    #[test]
+    fn version_line_tracks_the_crate_version() {
+        assert!(version_line().ends_with(env!("CARGO_PKG_VERSION")));
+        assert!(help_text().starts_with(&version_line()));
     }
 }
