@@ -61,6 +61,20 @@ jobs:
           check server.json "$(node -p "require('./server.json').version")"
           check "server.json packages[0]" "$(node -p "require('./server.json').packages[0].version")"
           check npm/droidsight/package.json "$(node -p "require('./npm/droidsight/package.json').version")"
+
+          # The MCP registry proves that whoever registers a server also controls
+          # the npm package behind it, by requiring the published package to
+          # carry an mcpName equal to the server.json name. It reads the package
+          # already on the registry, so a mismatch cannot be corrected in place:
+          # the fix has to ride a version that has not been published yet.
+          # Checking it here costs nothing and fails the tag instead.
+          server_name="$(node -p "require('./server.json').name")"
+          package_mcp_name="$(node -p "require('./npm/droidsight/package.json').mcpName")"
+          if [ "$package_mcp_name" != "$server_name" ]; then
+            echo "::error::npm mcpName is $package_mcp_name, expected $server_name" >&2
+            status=1
+          fi
+
           exit $status
 
   build:
