@@ -164,8 +164,29 @@ jobs:
       # Trusted publishing needs a newer npm than the one bundled with Node 22.
       # Without this the publish steps fail authentication, because there is
       # deliberately no long-lived NPM_TOKEN to fall back to.
+      #
+      # Pinned to a major rather than @latest. Every npm major so far has
+      # dropped the oldest Node line it supported, and this job pins Node 22, so
+      # a future npm 13 is likely to be one this runner cannot execute. Left
+      # floating, that break arrives on npm's release day rather than on ours --
+      # in the middle of a release, with the tag already spent. Dependabot does
+      # not watch this, because it is a run step and not a manifest.
       - name: Use an npm that supports trusted publishing
-        run: npm install -g npm@latest
+        run: npm install -g npm@12
+
+      # Cheap, and deliberately ahead of everything irreversible. If the pin
+      # above ever resolves to an npm that cannot mint an OIDC token, this ends
+      # the run while the tag is still re-runnable, instead of after the GitHub
+      # release exists and only the npm half is missing.
+      - name: Verify that npm can use trusted publishing
+        run: |
+          set -euo pipefail
+          version="$(npm --version)"
+          echo "npm $version on node $(node --version)"
+          if [ "$(printf '11.5.1\n%s\n' "$version" | sort -V | head -n 1)" != "11.5.1" ]; then
+            echo "::error::npm $version is too old for trusted publishing (needs >= 11.5.1)" >&2
+            exit 1
+          fi
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
