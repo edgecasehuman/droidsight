@@ -25,7 +25,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Every runner label the release matrix uses appears here, including the
+        # two that are otherwise release-only. Hosted images are retired on a
+        # calendar rather than in response to anything in this repository, so a
+        # label can stop existing without a single commit touching it -- and the
+        # release is the worst place to find that out, because a tag is already
+        # spent by then. macos-13 was retired exactly that way.
+        os:
+          [
+            ubuntu-latest,
+            ubuntu-24.04-arm,
+            macos-latest,
+            macos-15-intel,
+            windows-latest,
+          ]
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
