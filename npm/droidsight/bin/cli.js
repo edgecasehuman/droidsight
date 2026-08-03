@@ -47,7 +47,21 @@ try {
 
 // stdio: "inherit" hands the real descriptors to the child, so the JSON-RPC
 // stream is never copied through this process or re-encoded.
-const child = spawn(binary, process.argv.slice(2), { stdio: "inherit" });
+//
+// A missing file is reported asynchronously, on the error event below. A file
+// that exists but cannot be executed is not: spawn throws synchronously for
+// it, so the handler never sees that case at all. That is the likelier failure
+// here, because require.resolve above has already proven the file exists --
+// what is left is a binary quarantined by antivirus, truncated by an
+// interrupted download, or built for another architecture. Without the catch,
+// the user gets a Node stack trace instead of a sentence naming the file.
+let child;
+try {
+  child = spawn(binary, process.argv.slice(2), { stdio: "inherit" });
+} catch (error) {
+  console.error(`droidsight: failed to start ${binary}: ${error.message}`);
+  process.exit(1);
+}
 
 child.on("error", (error) => {
   console.error(`droidsight: failed to start ${binary}: ${error.message}`);
