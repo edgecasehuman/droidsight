@@ -68,6 +68,11 @@ jobs:
       - name: Verify the platform list agrees with itself
         run: node npm/check-platform-consistency.mjs
 
+      # release.yml checks the versions against the tag, which is the expensive
+      # place to learn they disagree. This is the same check without the tag.
+      - name: Verify the version and package identity agree with themselves
+        run: node npm/check-version-consistency.mjs
+
   # `rust-version` in Cargo.toml is published to crates.io as a compatibility
   # promise, and the pinned toolchain above is far newer than it. Without this
   # job the promise is never tested, and a dependency bump or a newly stabilized
