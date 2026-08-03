@@ -1,7 +1,8 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.edgecasehuman/droidsight",
-  "description": "Drives a real Android device over ADB. Keeps a continuous H.264 screen stream decoded in memory so screenshots return from cache, and reports the coordinate space of every image it returns.",
+  "title": "droidsight",
+  "description": "Drives a real Android device over ADB and attaches the resulting screen to every action.",
   "repository": {
     "url": "https://github.com/edgecasehuman/droidsight",
     "source": "github"
