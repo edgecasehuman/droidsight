@@ -80,6 +80,33 @@ compare(
     })
 );
 
+// The launcher hardcodes the executable's filename, while
+// build-platform-package.mjs takes it from platforms.json. Both agree today and
+// nothing links them. If they ever disagree, require.resolve fails and the
+// launcher reports "the platform package is not installed" -- which is a lie:
+// the package is installed, only the name inside it differs. That message sends
+// the user to reinstall, which cannot fix it.
+const binaryNames = /process\.platform === "win32"\s*\?\s*"([^"]+)"\s*:\s*"([^"]+)"/.exec(
+  launcher
+);
+if (!binaryNames) {
+  problems.push(
+    "cli.js no longer selects the binary name with a process.platform ternary, " +
+      "so this check can no longer read it -- update the check with the code"
+  );
+} else {
+  const [, windowsBinary, otherBinary] = binaryNames;
+  for (const entry of platforms) {
+    const expected = entry.os === "win32" ? windowsBinary : otherBinary;
+    if (entry.bin !== expected) {
+      problems.push(
+        `platforms.json builds ${entry.pkg} as '${entry.bin}', but cli.js looks ` +
+          `for '${expected}' on ${entry.os}`
+      );
+    }
+  }
+}
+
 const workflow = readFileSync(
   join(root, ".github", "workflows", "release.yml"),
   "utf8"
