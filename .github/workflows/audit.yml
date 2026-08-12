@@ -5,17 +5,12 @@ name: Security audit
 # pinned here, which no dependency update would surface. The schedule is what
 # makes that useful, so it runs weekly as well as on dependency changes.
 on:
+  # Keep this check present on every pull request because branch protection
+  # requires it, and dependency risk can enter through source or workflow
+  # changes even when Cargo.toml/Cargo.lock are untouched.
   pull_request:
-    paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/workflows/audit.yml"
   push:
     branches: [main]
-    paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/workflows/audit.yml"
   schedule:
     - cron: "0 7 * * 1"
   workflow_dispatch:
