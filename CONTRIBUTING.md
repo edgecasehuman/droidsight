@@ -49,6 +49,23 @@ of the defense:
   interpolated into it that did not come from this crate must be wrapped in
   `adb::shell_quote` first.
 
+## Secret and personal-data checks
+
+The ignore file is deliberately conservative, but it is not a security
+boundary: `git add -f` can bypass it and a file that was committed once remains
+in history. Install the staged secret hook before making commits:
+
+```sh
+pre-commit install
+pre-commit run --all-files
+```
+
+Before committing, inspect `git diff --cached --name-status` and the staged
+diff. Never commit real device captures, browser exports, cookies, tokens,
+credentials, personal logs, or unredacted screenshots. Use synthetic fixtures
+when a test needs an example value. CI repeats the Gitleaks history scan, so a
+finding must be removed and rotated rather than hidden with an ignore rule.
+
 ## Development checks
 
 The pinned compiler, formatter, and linter are declared in

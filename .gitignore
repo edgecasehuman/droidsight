@@ -10,13 +10,80 @@ npm/dist/
 /npm/droidsight/LICENSE
 node_modules/
 
-# Secrets and local environment. Never commit these.
+# Secrets and local environment. Never commit these. These rules are a first
+# line of defense only; the staged secret scan in CI is the enforcement layer.
 .env
 .env.*
+*.env
+*.env.*
+!.env.example
+!*.env.example
+.npmrc
+.pypirc
+.netrc
+.authinfo
+credentials/
+credentials.*
+secrets/
+secrets.*
+tokens/
+tokens.*
+private/
+personal/
+confidential/
+sensitive/
+exports/
+captures/
+evidence/
+artifacts/
+reports/
+*.secret
+*.secrets
+*.token
+*.token.*
+*.credentials
+token.txt
+tokens.txt
+secret.txt
+secrets.txt
+credentials.txt
 *.pem
 *.key
 *.keystore
 *.jks
+*.p12
+*.pfx
+*.kdbx
+*.asc
+*.gpg
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+.aws/
+.azure/
+.gcloud/
+.kube/
+.ssh/
+
+# Local data exports and browser/network captures can contain personal text,
+# cookies, authorization headers, or device identifiers.
+*.sqlite
+*.sqlite3
+*.db
+*.db-*
+state.json
+baseline.json
+*.csv
+*.tsv
+*.jsonl
+*.ndjson
+*.har
+*.pcap
+*.pcapng
+*.trace
+*.dmp
+*.etl
 
 # Coding-agent and editor working directories. These routinely contain absolute
 # local paths, transcripts, and machine names.
@@ -63,6 +130,10 @@ mcp_*.log
 *.dll
 *.so
 *.dylib
+*.tmp
+*.temp
+*.tgz
+*.tar.gz
 
 # Hardware-smoke transfer destination.
 .droidsight_probe_pull
@@ -76,3 +147,6 @@ local/
 *.local
 *.orig
 *.rej
+Thumbs.db
+desktop.ini
+.DS_Store
