@@ -62,7 +62,7 @@ jobs:
       - name: Install mcp-publisher 1.8.1
         shell: bash
         env:
-          PUBLISHER_SHA256: 399ad0d6e00a50812b563a71d8bfbff5160c085e6b13aac6ec083d98d5ff7c45
+          PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/mcp-publisher.tar.gz"
