@@ -70,7 +70,14 @@ finding must be removed and rotated rather than hidden with an ignore rule.
 
 The pinned compiler, formatter, and linter are declared in
 `rust-toolchain.toml`. Install rustup, then run all required host-side gates from
-the repository root:
+the repository root.
+
+One prerequisite is not managed by rustup: `openh264-sys2` builds Cisco's H.264
+decoder from C++ and assembles its hot paths with **NASM**, which no platform
+preinstalls. Without `nasm` on the PATH every command below fails inside that
+dependency rather than in this crate, which makes the cause hard to read. Install
+it with `apt install nasm`, `brew install nasm`, or `winget install NASM.NASM`.
+CI installs it the same way, as the first step of every job that compiles.
 
 ```sh
 cargo fmt --all -- --check

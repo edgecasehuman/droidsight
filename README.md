@@ -3,6 +3,8 @@
 [![CI](https://github.com/edgecasehuman/droidsight/actions/workflows/ci.yml/badge.svg)](https://github.com/edgecasehuman/droidsight/actions/workflows/ci.yml)
 [![Security audit](https://github.com/edgecasehuman/droidsight/actions/workflows/audit.yml/badge.svg)](https://github.com/edgecasehuman/droidsight/actions/workflows/audit.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![crates.io](https://img.shields.io/crates/v/droidsight.svg)](https://crates.io/crates/droidsight)
+[![npm](https://img.shields.io/npm/v/%40edgecasehuman%2Fdroidsight.svg)](https://www.npmjs.com/package/@edgecasehuman/droidsight)
 
 An MCP server that drives a real Android device over ADB — and hands the agent
 back the screen its action produced.
@@ -28,14 +30,34 @@ and an MCP client you trust.
 npx -y @edgecasehuman/droidsight
 ```
 
-Or build from source:
+That downloads a prebuilt binary for your platform and needs no build tools. The
+server is also listed in the official [MCP Registry] as
+`io.github.edgecasehuman/droidsight`.
+
+To compile it instead, from [crates.io]:
+
+```bash
+cargo install droidsight
+```
+
+Or from source:
 
 ```bash
 cargo build --locked --release --bin droidsight
 ```
 
+**Both compiling routes need NASM on the PATH.** The H.264 decoder is built from
+C++ by `openh264-sys2`, which assembles its hot paths with NASM, and no platform
+ships it by default -- without it the build fails inside a transitive dependency
+rather than in this crate. Install it with `apt install nasm`,
+`brew install nasm`, or `winget install NASM.NASM`. The `npx` route above needs
+none of this.
+
 The server is `target/release/droidsight`. It speaks newline-delimited
 JSON-RPC 2.0 over stdin and stdout.
+
+[MCP Registry]: https://registry.modelcontextprotocol.io
+[crates.io]: https://crates.io/crates/droidsight
 
 ### Client configuration
 
