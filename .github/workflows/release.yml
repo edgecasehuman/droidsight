@@ -157,6 +157,8 @@ jobs:
       # Required for npm trusted publishing, which mints a short-lived token and
       # attaches a provenance attestation instead of using a long-lived secret.
       id-token: write
+      # The same mechanism, for the standalone archives, which npm never sees.
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -195,15 +197,58 @@ jobs:
         with:
           path: artifacts
 
-      # The npm packages carry provenance attestations, but the standalone
-      # archives are unsigned and unattested. A published hash is the only
-      # integrity check someone downloading a tarball directly can perform.
+      # A published hash says a tarball has not changed since it was hashed, but
+      # this workflow both computes and publishes it, so it cannot say what
+      # produced it.
       - name: Record SHA-256 for the standalone archives
         run: |
           set -euo pipefail
           sha256sum artifacts/archive-*/*.tar.gz \
             | sed 's#artifacts/archive-[^/]*/##' > SHA256SUMS
           cat SHA256SUMS
+
+      # The npm packages have always carried provenance; the archives did not,
+      # and someone who downloads a tarball rather than installing from npm had
+      # only the hash above. This binds each archive to this workflow, this
+      # commit, and this repository, checkable with `gh attestation verify`.
+      #
+      # Deliberately ahead of anything published, like the npm checks above: a
+      # failure here ends the run while the tag is still re-runnable.
+      - name: Attest the standalone archives
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: artifacts/archive-*/*.tar.gz
+
+      # The reason to upgrade is written while the change is made, not
+      # reconstructed after the tag. --generate-notes produced a commit list,
+      # which describes the work rather than what it means for someone reading
+      # the release page. An absent section fails the run before it publishes.
+      - name: Take the release notes from the changelog
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          awk -v want="$VERSION" '
+            $0 ~ ("^## \\[" want "\\]") { inside = 1; next }
+            inside && /^## / { exit }
+            inside { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md has no section for $VERSION" >&2
+            exit 1
+          fi
+          {
+            echo ""
+            echo "## Checksums"
+            echo ""
+            echo '```'
+            cat SHA256SUMS
+            echo '```'
+            echo ""
+            echo "Every archive also carries a build provenance attestation:"
+            echo "\`gh attestation verify <archive> --repo $GITHUB_REPOSITORY\`."
+          } >> notes.md
+          cat notes.md
 
       # Deliberately ahead of the npm steps. npm can fail for reasons that have
       # nothing to do with this repository — a trusted publisher not configured
@@ -224,7 +269,7 @@ jobs:
           else
             gh release create "$TAG" \
               --title "$TAG" \
-              --generate-notes \
+              --notes-file notes.md \
               artifacts/archive-*/*.tar.gz SHA256SUMS
           fi
 
