@@ -10,8 +10,38 @@
 
 const { spawn } = require("node:child_process");
 const { constants } = require("node:os");
+const { writeSync } = require("node:fs");
 
 const FORWARDED_SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP"];
+
+// Every diagnostic below is followed immediately by process.exit, and that pair
+// is exactly where console.error loses its output: writes to stderr are only
+// synchronous for a TTY or a regular file. To a pipe on POSIX they are queued,
+// and process.exit does not drain the queue. An MCP client always hands this
+// process a pipe for stderr, so the plain form would drop these messages in the
+// one situation they were written for, while looking correct in every terminal
+// test. writeSync bypasses the queue. A non-blocking pipe can refuse the write
+// with EAGAIN, which means retry rather than failed; EPIPE means the reader is
+// already gone, and there is no one left to tell.
+function fail(message) {
+  const buffer = Buffer.from(`${message}\n`, "utf8");
+  let written = 0;
+  while (written < buffer.length) {
+    try {
+      written += writeSync(2, buffer, written);
+    } catch (error) {
+      if (error.code === "EAGAIN") {
+        continue;
+      }
+      if (error.code !== "EPIPE") {
+        // Last resort: report through the lossy path rather than not at all.
+        console.error(message);
+      }
+      break;
+    }
+  }
+  process.exit(1);
+}
 
 const PACKAGES = {
   "linux-x64": "@edgecasehuman/droidsight-linux-x64",
@@ -25,24 +55,22 @@ const key = `${process.platform}-${process.arch}`;
 const pkg = PACKAGES[key];
 
 if (!pkg) {
-  console.error(
+  fail(
     `droidsight: no prebuilt binary for ${key}.\n` +
       `Supported: ${Object.keys(PACKAGES).join(", ")}.\n` +
-      `Build from source instead: cargo install --git https://github.com/edgecasehuman/droidsight droidsight`
+      `Build from source instead: cargo install droidsight (needs NASM on the PATH).`
   );
-  process.exit(1);
 }
 
 let binary;
 try {
   binary = require.resolve(`${pkg}/bin/${process.platform === "win32" ? "droidsight.exe" : "droidsight"}`);
 } catch {
-  console.error(
+  fail(
     `droidsight: the platform package ${pkg} is not installed.\n` +
       `This usually means the install ran with --no-optional or --omit=optional.\n` +
       `Reinstall without those flags, or install it directly: npm i ${pkg}`
   );
-  process.exit(1);
 }
 
 // stdio: "inherit" hands the real descriptors to the child, so the JSON-RPC
@@ -59,13 +87,11 @@ let child;
 try {
   child = spawn(binary, process.argv.slice(2), { stdio: "inherit" });
 } catch (error) {
-  console.error(`droidsight: failed to start ${binary}: ${error.message}`);
-  process.exit(1);
+  fail(`droidsight: failed to start ${binary}: ${error.message}`);
 }
 
 child.on("error", (error) => {
-  console.error(`droidsight: failed to start ${binary}: ${error.message}`);
-  process.exit(1);
+  fail(`droidsight: failed to start ${binary}: ${error.message}`);
 });
 
 // Forward termination so a client killing the launcher stops the server too.
